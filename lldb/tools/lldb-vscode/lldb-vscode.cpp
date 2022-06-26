@@ -1208,9 +1208,13 @@ void request_evaluate(const llvm::json::Object &request) {
   const auto expression = GetString(arguments, "expression");
   llvm::StringRef context = GetString(arguments, "context");
 
-  if (!expression.empty() && expression[0] == '`') {
-    auto result =
-        RunLLDBCommands(llvm::StringRef(), {std::string(expression.substr(1))});
+  const auto is_repl = context == "repl";
+  // When the context is 'repl' that means the expression came from the debug
+  // console. Treat expressions from the debug console as LLDB commands.
+  // Preserve the true REPL behavior for expressions that begin with a backtick.
+  if (is_repl && (expression.empty() || expression[0] != '`'))  {
+    auto result = RunLLDBCommands(llvm::StringRef(),
+                                     {expression.str()});
     EmplaceSafeString(body, "result", result);
     body.try_emplace("variablesReference", (int64_t)0);
   } else {
@@ -1220,15 +1224,16 @@ void request_evaluate(const llvm::json::Object &request) {
     //
     // "frame variable" is more reliable than the expression parser in
     // many cases and it is faster.
+    auto expr = is_repl ? expression.substr(1).data() : expression.data();
     lldb::SBValue value = frame.GetValueForVariablePath(
-        expression.data(), lldb::eDynamicDontRunTarget);
+        expr, lldb::eDynamicDontRunTarget);
 
     // Freeze dry the value in case users expand it later in the debug console
     if (value.GetError().Success() && context == "repl")
       value = value.Persist();
 
     if (value.GetError().Fail() && context != "hover")
-      value = frame.EvaluateExpression(expression.data());
+      value = frame.EvaluateExpression(expr);
 
     if (value.GetError().Fail()) {
       response["success"] = llvm::json::Value(false);
