@@ -16,6 +16,11 @@ if(APPLE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/lldb-vscode-Info.plist")
 endif()
 
+set(LIBLLDB liblldb)
+if (LLDB_PREBUILT_FRAMEWORK)
+  set(LIBLLDB ${LLDB_PREBUILT_FRAMEWORK})
+endif ()
+
 # We need to include the llvm components we depend on manually, as liblldb does
 # not re-export those.
 set(LLVM_LINK_COMPONENTS Support)
@@ -38,7 +43,7 @@ add_lldb_tool(lldb-vscode
   VSCode.cpp
 
   LINK_LIBS
-    liblldb
+    ${LIBLLDB}
     ${extra_libs}
 
   LINK_COMPONENTS
